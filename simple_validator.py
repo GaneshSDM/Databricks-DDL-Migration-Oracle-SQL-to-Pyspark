@@ -7,18 +7,18 @@ class SimpleValidator:
         self.oracle_to_databricks = {
             # Data types
             r'\bNUMBER\s*\(\s*\d+\s*,\s*\d+\s*\)': 'DECIMAL',
-            r'\bNUMBER\s*\(\s*\d+\s*\)': 'DECIMAL',
-            r'\bNUMBER\b': 'DECIMAL',
-            r'\bVARCHAR2\s*\(\s*\d+\s*\)': lambda m: f"VARCHAR",
-            r'\bVARCHAR2\b': 'VARCHAR',
+            r'\bNUMBER\s*\(\s*\d+\s*\)': 'BIGINT',
+            r'\bNUMBER\b': 'BIGINT',
+            r'\bVARCHAR2\s*\(\s*\d+\s*\)': lambda m: f"STRING",
+            r'\bVARCHAR2\b': 'STRING',
             r'\bCLOB\b': 'STRING',
             r'\bBLOB\b': 'BINARY',
             r'\bRAW\s*\(\s*\d+\s*\)': 'BINARY',
             r'\bLONG\b': 'STRING',
-            r'\bDATE\b': 'DATE',
+            r'\bDATE\b': 'TIMESTAMP',
             
             # Functions
-            r'\bSYSDATE\b': 'CURRENT_DATE',
+            r'\bSYSDATE\b': 'CURRENT_TIMESTAMP()',
             r'\bSYSTIMESTAMP\b': 'CURRENT_TIMESTAMP()',
             r'\bUSER\b': 'CURRENT_USER()',
             r'\bNVL\s*\(': 'COALESCE(',
@@ -111,14 +111,10 @@ class SimpleValidator:
         
         # Remove markdown code blocks
         sql = re.sub(r'```sql\s*', '', sql, flags=re.IGNORECASE)
-        sql = re.sub(r'```python\s*', '', sql, flags=re.IGNORECASE)
         sql = re.sub(r'```\s*', '', sql)
         
         # Remove comments about changes
         sql = re.sub(r'--.*?Changes and Enhancements.*', '', sql, flags=re.DOTALL)
-        sql = re.sub(r'###\s+Limitations and Manual Review.*?(?=###|\Z)', '', sql, flags=re.DOTALL)
-        sql = re.sub(r'###\s+Limitations and Assumptions.*?(?=###|\Z)', '', sql, flags=re.DOTALL)
-        sql = re.sub(r'###\s+Automation Feasibility.*?(?=###|\Z)', '', sql, flags=re.DOTALL)
         sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
         
         # Normalize whitespace
@@ -174,9 +170,9 @@ class SimpleValidator:
         
         # Check for Oracle remnants
         oracle_patterns = {
-            r'\bNUMBER\b': 'Use DECIMAL instead of NUMBER',
-            r'\bVARCHAR2\b': 'Use VARCHAR instead of VARCHAR2',
-            r'\bSYSDATE\b': 'Use CURRENT_DATE instead of SYSDATE',
+            r'\bNUMBER\b': 'Use BIGINT or DECIMAL instead of NUMBER',
+            r'\bVARCHAR2\b': 'Use STRING instead of VARCHAR2',
+            r'\bSYSDATE\b': 'Use CURRENT_TIMESTAMP() instead of SYSDATE',
             r'\bROWNUM\b': 'Use ROW_NUMBER() window function instead of ROWNUM',
             r'\bDUAL\b': 'Remove FROM DUAL - not needed in Databricks',
             r'\bSEQUENCE\b': 'Use AUTO_INCREMENT or generated columns',
@@ -407,6 +403,7 @@ class SimpleValidator:
             summary += f" | {total_issues} Total Issues"
         
         return summary
+
 
 
 
