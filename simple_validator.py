@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 class SimpleValidator:
     def __init__(self):
         self.oracle_to_databricks = {
-            print("Initializing SimpleValidator...")
+            print("Initializing SimpleValidator.......")
             # Data types
             r'\bNUMBER\s*\(\s*\d+\s*,\s*\d+\s*\)': 'DECIMAL',
             r'\bNUMBER\s*\(\s*\d+\s*\)': 'BIGINT',
