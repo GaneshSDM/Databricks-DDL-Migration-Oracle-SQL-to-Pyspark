@@ -21,8 +21,8 @@ st.set_page_config(
 load_dotenv()
 
 # NOTE: API_URL and API_KEY are hardcoded here, but should ideally come from .env
-API_URL = "https://dbc-37bc150e-02bd.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
-API_KEY = "dapi0be08c7c8b1ed66f1a11cb5b71cee86f"
+API_URL = "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
+API_KEY = "dapi6904c531d301bb5b90df82e2a168c1db"
 
 if "migration_ai" not in st.session_state:
     st.session_state.migration_ai = MigrationAI(api_key=API_KEY)
@@ -225,12 +225,16 @@ if "conversion_history" not in st.session_state:
 if "model_settings" not in st.session_state:
     # Default to first model from settings page
     default_models = {
-        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-37bc150e-02bd.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations",
-        "databricks-claude-sonnet-4-5": "https://dbc-9b0b9b10-666b.cloud.databricks.com/serving-endpoints/databricks-claude-sonnet-4-5/invocations",
-        "databricks-gemini-2-5-pro": "https://dbc-9b0b9b10-666b.cloud.databricks.com/serving-endpoints/databricks-gemini-2-5-pro/invocations",
-        "databricks-gpt-oss-120b": "https://dbc-37bc150e-02bd.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-9b0b9b10-666b.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
-        "databricks-claude-opus-4-1": "https://dbc-9b0b9b10-666b.cloud.databricks.com/serving-endpoints/databricks-claude-opus-4-1/invocations"
+        "databricks-gpt-5-2": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-5-2/invocations",
+        "databricks-gpt-5-1": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-5-1/invocations",
+        "databricks-gpt-oss-120b": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
+        "databricks-gpt-oss-20b": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-20b/invocations",
+        "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
+        "databricks-llama-4-maverick": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-llama-4-maverick/invocations",
+        "databricks-gemma-3-12b": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gemma-3-12b/invocations",
+        "databricks-meta-llama-3-1-8b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-8b-instruct/invocations",
+        "databricks-meta-llama-3-3-70b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-3-70b-instruct/invocations",
+        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations"
     }
     first_model = list(default_models.keys())[0]
     
@@ -571,12 +575,16 @@ def render_settings_page():
     
     # Model endpoints mapping
     model_endpoints = {
-        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-claude-sonnet-4-5": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-gemini-2-5-pro": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-gpt-oss-120b": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-claude-opus-4-1": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
+        "databricks-gpt-5-2": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-5-2/invocations",
+        "databricks-gpt-5-1": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-5-1/invocations",
+        "databricks-gpt-oss-120b": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
+        "databricks-gpt-oss-20b": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-20b/invocations",
+        "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
+        "databricks-llama-4-maverick": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-llama-4-maverick/invocations",
+        "databricks-gemma-3-12b": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gemma-3-12b/invocations",
+        "databricks-meta-llama-3-1-8b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-8b-instruct/invocations",
+        "databricks-meta-llama-3-3-70b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-3-70b-instruct/invocations",
+        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations"
     }
     
     c1, c2 = st.columns(2)
@@ -643,7 +651,7 @@ def main():
         
     st.markdown("""
     <div class="footer">
-        © 2025 Decision Minds | Powered by Databricks Accelerator<br>
+        © 2026 Decision Minds | Powered by Databricks Accelerator<br>
         Version 2.0.0 Enterprise Edition
     </div>
     """, unsafe_allow_html=True)
