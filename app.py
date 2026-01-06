@@ -22,7 +22,7 @@ load_dotenv()
 
 # NOTE: API_URL and API_KEY are hardcoded here, but should ideally come from .env
 API_URL = "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
-API_KEY = "dapi547489a01469ad08d2c0b8409b65e1fe"
+API_KEY = "dapi515411f84856df580d21b414e3fe5061"
 
 if "migration_ai" not in st.session_state:
     st.session_state.migration_ai = MigrationAI(api_key=API_KEY)
