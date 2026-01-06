@@ -21,8 +21,8 @@ st.set_page_config(
 load_dotenv()
 
 # NOTE: API_URL and API_KEY are hardcoded here, but should ideally come from .env
-API_URL = "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
-API_KEY = "dapi31a4d352082f4e740f88e86cbee1bf1f"
+API_URL = "https://dbc-37bc150e-02bd.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
+API_KEY = "dapi0be08c7c8b1ed66f1a11cb5b71cee86f"
 
 if "migration_ai" not in st.session_state:
     st.session_state.migration_ai = MigrationAI(api_key=API_KEY)
@@ -225,10 +225,10 @@ if "conversion_history" not in st.session_state:
 if "model_settings" not in st.session_state:
     # Default to first model from settings page
     default_models = {
-        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations",
+        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-37bc150e-02bd.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations",
         "databricks-claude-sonnet-4-5": "https://dbc-9b0b9b10-666b.cloud.databricks.com/serving-endpoints/databricks-claude-sonnet-4-5/invocations",
         "databricks-gemini-2-5-pro": "https://dbc-9b0b9b10-666b.cloud.databricks.com/serving-endpoints/databricks-gemini-2-5-pro/invocations",
-        "databricks-gpt-oss-120b": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
+        "databricks-gpt-oss-120b": "https://dbc-37bc150e-02bd.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
         "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-9b0b9b10-666b.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
         "databricks-claude-opus-4-1": "https://dbc-9b0b9b10-666b.cloud.databricks.com/serving-endpoints/databricks-claude-opus-4-1/invocations"
     }
