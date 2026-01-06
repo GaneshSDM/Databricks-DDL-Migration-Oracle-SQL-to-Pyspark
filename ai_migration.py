@@ -113,7 +113,7 @@ class MigrationAI:
 **2. STRICT DATA TYPE MAPPING:**
 
 * `NUMBER(p, s)` -> `DECIMAL(p, s)` (Mandatory: Do NOT use INT/BIGINT)
-* `VARCHAR2(n)` / `CHAR(n)` -> `VARCHAR(n)` / `CHAR(n)` (Mandatory: Do NOT use STRING)
+* `VARCHAR2(n)`  -> `STRING`
 * `BFILE` -> `STRING`
 * `LONG RAW` / `BLOB` /  -> `BINARY`
 * `VARRAY` -> `ARRAY<STRING>`
