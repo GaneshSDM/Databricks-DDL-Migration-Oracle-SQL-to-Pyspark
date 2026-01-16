@@ -105,10 +105,10 @@ class MigrationAI:
       
       Key conversion considerations:
         - Remove or correct double quotes (`"Column"`)
-        - If the source is NUMBER with no precision and no scale (e.g., NUMBER), always convert to INT.
-        - If the source is NUMBER(p) with no scale (e.g., NUMBER(10)), always convert to BIGINT.
-        - If the source is NUMBER(p, s) with a scale (e.g., NUMBER(10,2)), always convert to DECIMAL(p, s).
-        - Convert data type definitions (e.g., `VARCHAR` to `VARCHAR`, NUMBER to INT (if no scale is provided) or DECIMAL (if precision/scale are provided). If the column is an ID or Key, always use INT.).
+        - [MANDATORY] If the source is NUMBER with no precision and no scale (e.g., NUMBER), always convert to INT.
+        - [MANDATORY] If the source is NUMBER(p) with no scale (e.g., NUMBER(10)), always convert to DECIMAL(p).
+        - [MANDATORY] If the source is NUMBER(p, s) with a scale (e.g., NUMBER(10,2)), always convert to DECIMAL(p, s).
+        - [MANDATORY] Map Oracle NUMBER (with no precision and no scale) strictly to INT. Do NOT use DECIMAL for plain NUMBER columns.
         - Parameter markers (e.g., :param) are currently not allowed in the body of a CREATE VIEW statement in Databricks SQL. Do not Use parameters in CREATE VIEW. Use params in all other types of SQL.
         - Ensure all syntax is 100% compatible with the Databricks SQL engine on Databricks Runtime 14.x or newer.
         - Maintain the original logic, formatting, and comments from the source query.
@@ -136,10 +136,7 @@ notebook:
       
       - Storage Clause Translation: Oracle-specific storage clauses (PARTITION BY RANGE/LIST/HASH, TABLESPACE, STORAGE) must be converted to Databricks SQL syntax.
       - Partitioning: Replace PARTITION BY RANGE (...) (...) blocks entirely. Extract the column name used in the range and apply it to a CLUSTER BY (column_name) clause at the end of the CREATE TABLE statement.
-      - No Named Partitions: Remove all PARTITION <name> VALUES LESS THAN (...) syntax as it is not supported in Databricks.
-      - [MANDATORY] `IDENTIFIER` usage is not allowed with (temporary) VIEWs. Change [TEMP] or regular VIEWs to just TABLEs [NOT temp] to Use IDENTIFIER. Use target_schema for creating tables.
-      - Replace hard-coded catalog.schema.table references with IDENTIFIER(:source_schema || ''.table'') or, when writing/creating/altering objects (DDL only), IDENTIFIER(:target_schema || ''.table'') as appropriate, keeping the original table/view/function/procedure name.
-      - [MANDATORY] Reference widgets as `:widget` or `IDENTIFIER(:widget || ''.table'')`. ${{widget}} usage is not allowed inside the stored procedure.
+      - No Named Partitions: Remove all PARTITION <name> VALUES LESS THAN (...) syntax as it is not supported in Databricks. 
       - [MANDATORY] Try to not put special characters in variable names. If you have to include special characters in key, or include semicolon in value, please Use backquotes, e.g., SET `key`=`value`.
       - [MANDATORY] Table Storage: Every CREATE TABLE statement must explicitly include the USING DELTA clause before the closing semicolon. Do not change any other column definitions or logic while adding this clause
       - [MANDATORY] When converting to STRING or BINARY, remove any length specifications from the source. For example, RAW(16) must become BINARY, and UROWID(4000) or VARCHAR2(X) must become STRING.
@@ -147,11 +144,19 @@ notebook:
       - [MANDATORY] If any column in a CREATE TABLE statement uses the DEFAULT keyword, you must append the following property at the very end of the statement (after USING DELTA): TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
       - [MANDATORY] Ensure the DEFAULT <value> stays within the column definition logic, and only the TBLPROPERTIES is added at the end.
       - [MANDATORY] Convert all variations of Oracle Timestamps (TIMESTAMP, TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH LOCAL TIME ZONE) simply to TIMESTAMP.
+      - Forbidden: Do NOT include CHECK or UNIQUE keywords inside the CREATE TABLE (...) parentheses.
+      - [MANDATORY] Standalone ALTER TABLE is ONLY for CHECK and UNIQUE. All PRIMARY KEY and FOREIGN KEY must stay inside the CREATE TABLE block.
+      - MANDATORY REMOVAL: Identify all CHECK and UNIQUE constraints. You MUST remove them from the body of the CREATE TABLE statement entirely.
+      - MANDATORY ALTER: Generate each CHECK and UNIQUE constraint ONLY as a standalone ALTER TABLE statement appearing after the CREATE TABLE statement.
+      - KEY PRESERVATION: Keep PRIMARY KEY and FOREIGN KEY inside the CREATE TABLE definition. Do not move them to ALTER.
+      - [MANDATORY] Default Value Property: If any column definition within the CREATE TABLE statement contains the keyword DEFAULT, you MUST append the TBLPROPERTIES clause immediately following USING DELTA.
+      - [MANDATORY] Syntax: Always use CREATE TABLE (do NOT use OR REPLACE).
+      - The syntax must be: USING DELTA TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported');
       - Convert all Oracle NCHAR(n) and NVARCHAR2(n) types to CHAR(n) and VARCHAR(n) respectively. Remove the N prefix but keep the fixed-length length logic.
       - Remove or correct double-quoted identifiers (e.g., "Column" → Column or `Column`).
-      - Map types/functions to Databricks SQL: Maintain VARCHAR and CHAR types with their specified lengths (e.g., CHAR(10) remains CHAR(10)); map NUMBER to DECIMAL or INT  GETDATE → CURRENT_TIMESTAMP).
+      - Map types/functions to Databricks SQL: Maintain VARCHAR and CHAR types with their specified lengths (e.g., CHAR(10) remains CHAR(10))).
       - Ensure syntax is valid on Databricks SQL (DBR 14.x+).
-      - Preserve original logic and formatting. Comments are allowed, but keep them concise and in proper SQL comment syntax.
+      - Preserve original logic and formatting. Comments are allowed, but keep them  concise and in proper SQL comment syntax.
       - Parameter markers (e.g., :param) are currently not allowed in the body of a CREATE VIEW statement in Databricks SQL. Do not Use parameters in CREATE VIEW. Use params in all other types of SQL.
       - Convert separate INSERT/UPDATE/DELETE operations into a single MERGE statement. Focus on: 1) Proper join conditions, 2) WHEN MATCHED/NOT MATCHED logic, 3) Error handling, and 4) Performance optimization through single table access. For example:
           MERGE INTO target USING source
@@ -313,14 +318,6 @@ notebook:
         - For every input parameter or variable in the stored procedure, create a widget with a realistic default value.
         - Use the same variable names as in the procedure. Do **not** create unUsed widgets.
       
-      Widget usage:
-        - Use widget variables directly in Python code (loops, conditionals, expressions).
-        - Interpolate widget values into SQL with Python f-strings, for example:
-            spark.sql(f""""SELECT * FROM {source_schema}.orders WHERE order_date = ''{as_of_date}'';"""")
-        - For schema-qualified identifiers:
-            - Use `{source_schema}` for reads / non-DDL.
-            - Use `{target_schema}` for writes / DDL (only if DDL is present).
-        - Keep object names (tables, views, functions) unchanged.
       
       Output format:
         - Output **Python notebook code only** (no prose, no markdown).
@@ -334,26 +331,19 @@ notebook:
       
       Databricks SQL compatibility:
         - Translate vendor-specific types and functions to Databricks SQL equivalents:
-            - `VARCHAR` → `VARCHAR`
-            - `NUMBER` → `DECIMAL` or `INT`
-            - `GETDATE` → `CURRENT_TIMESTAMP`
-        - Use Databricks SQL constructs where possible:
-            - `CREATE OR REPLACE TEMP VIEW ... AS SELECT ...` for staging
-            - `MERGE INTO` for upserts
-        - Remove or refactor unsupported procedural code (cursors, while loops, etc.) into Python + set-based SQL.
-        - Convert separate INSERT/UPDATE/DELETE operations into a single MERGE statement. Focus on: 1) Proper join conditions, 2) WHEN MATCHED/NOT MATCHED logic, 3) Error handling, and 4) Performance optimization through single table access. For example:
-            MERGE INTO target USING source
-            ON target.key = source.key
-            WHEN MATCHED AND target.marked_for_deletion THEN DELETE
-            WHEN MATCHED THEN UPDATE SET target.updated_at = source.updated_at, target.value = DEFAULT
-        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, Use MERGE. Do NOT Use `UPDATE ... FROM ...` under any circumstance.
-        - Analyze DDLs and identify all tables with ''fact'' in their name (case-insensitive). For each fact table found, change the CREATE TABLE statement to include CLUSTER BY AUTO for automatic liquid clustering optimization in Databricks. For example:
-            CREATE OR REPLACE TABLE ... (
-            id INT,
-            name STRING,
-            value DOUBLE
-            )
-            CLUSTER BY AUTO;
+            Databricks SQL compatibility:
+        - [MANDATORY] Data Type Mapping:
+            - Oracle `NUMBER` (no p,s) -> `INT`
+            - Oracle `NUMBER(p,s)` -> `DECIMAL(p,s)`
+            - Oracle `NCHAR/NVARCHAR` -> `CHAR/VARCHAR` (Remove 'N' prefix)
+            - Oracle `TIMESTAMP` (all variants) -> `TIMESTAMP`
+            - Oracle `GETDATE` -> `CURRENT_TIMESTAMP`
+        - [MANDATORY] Constraint Placement:
+            - Keep PRIMARY KEY and FOREIGN KEY inside CREATE TABLE.
+            - Move CHECK and UNIQUE to standalone ALTER TABLE statements.
+        - [MANDATORY] No `UPDATE FROM`: Use `MERGE INTO` for all multi-table updates or upserts.
+        - [MANDATORY] Storage: Every CREATE TABLE must use `USING DELTA`. If `DEFAULT` is present, add `TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')`.
+        - Fact Table Optimization: For tables with 'fact' in the name, append `CLUSTER BY AUTO`.
       
         %%##conversion_prompts##%%
         %%##additional_prompts##%%
@@ -380,31 +370,6 @@ workflow:
         - Dependencies:
             - If notebook B Uses an object created/modified in notebook A, then B depends_on A.
         - Prefer **parallel execution** where safe.
-      
-      HARD REQUIREMENTS (DO NOT SKIP):
-        - [MANDATORY] `IDENTIFIER` usage is not allowed with (temporary) VIEWs. Change [TEMP] or regular VIEWs to just TABLEs [NOT temp] to Use IDENTIFIER. Use target_schema for creating tables.
-        - [MANDATORY] Reference widgets as `:widget` or `IDENTIFIER(:widget || ''.table'')`. ${{widget}} usage is not allowed inside the stored procedure.
-        - [MANDATORY] Try to not put special characters in variable names. If you have to include special characters in key, or include semicolon in value, please Use backquotes, e.g., SET `key`=`value`.
-        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, Use MERGE. Do NOT Use `UPDATE ... FROM ...` under any circumstance.
-  
-      NOTEBOOK CONTENT RULES (SQL-only)
-        - Output strictly **SQL** (no Python). SQL comments allowed.
-        - First line must be exactly:
-          -- Databricks notebook source
-        - Separate cells with exactly:
-          -- COMMAND ----------
-        - First cell must contain **only widget definitions**:
-            - Always include:
-                CREATE WIDGET TEXT source_schema DEFAULT "main.source";
-            - Include **target_schema** only if any DDL exists in the overall conversion:
-                CREATE WIDGET TEXT target_schema DEFAULT "main.target";
-            - For every input parameter/variable/constant needed by any notebook, add a **TEXT widget** with a realistic default.
-              Use the same variable names as the procedure; do not create unUsed widgets.
-            - Do not create a widget for catalog; source_schema and target_schema already include the catalog.
-            - Do not insert an empty cell before widget definitions. The very first cell must begin with the widgets.
-        - Use widgets in SQL as bind variables (`:widget`) and for identifiers with IDENTIFIER():
-            SELECT * FROM IDENTIFIER(:source_schema || ''.orders'');
-            CREATE OR REPLACE TABLE IDENTIFIER(:target_schema || ''.dim_customer'') AS ...
         - Normalize to Databricks SQL (DBR 14.x+): types, functions, and syntax. End every statement with `;`.
         - Ensure every notebook is **idempotent**. End each with `;`.
   
@@ -485,38 +450,6 @@ workflow:
             - Avoid splitting inside a single transaction/atomic semantic (treat as one notebook).
         - Prefer **maximal parallelism** without violating correctness.
       
-      HARD REQUIREMENTS (DO NOT SKIP):
-        - [MANDATORY] `IDENTIFIER` usage is not allowed with (temporary) VIEWs. Change [TEMP] or regular VIEWs to just TABLEs [NOT temp] to Use IDENTIFIER. Use target_schema for creating tables.
-        - [MANDATORY] Reference widgets as `:widget` or `IDENTIFIER(:widget || ''.table'')`. ${{widget}} usage is not allowed inside the stored procedure.
-        - [MANDATORY] Try to not put special characters in variable names. If you have to include special characters in key, or include semicolon in value, please Use backquotes, e.g., SET `key`=`value`.
-        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, Use MERGE. Do NOT Use `UPDATE ... FROM ...` under any circumstance.
-        
-      NOTEBOOK CONTENT RULES (SQL-only)
-        - Output strictly **SQL** (no Python). SQL comments allowed.
-        - First line must be exactly:
-          -- Databricks notebook source
-        - Separate cells with exactly:
-          -- COMMAND ----------
-        - First cell must contain **only widget definitions**:
-            - Always include:
-                CREATE WIDGET TEXT source_schema DEFAULT "main.source";
-            - Include **target_schema** only if any DDL exists in the overall conversion:
-                CREATE WIDGET TEXT target_schema DEFAULT "main.target";
-            - For every input parameter/variable/constant needed by any notebook, add a **TEXT widget** with a realistic default.
-              Use the same variable names as the procedure; do not create unUsed widgets.
-            - Do not create a widget for catalog; source_schema and target_schema already include the catalog.
-            - Do not insert an empty cell before widget definitions. The very first cell must begin with the widgets.
-        - Use widgets in SQL as bind variables (`:widget`) and for identifiers with IDENTIFIER():
-            SELECT * FROM IDENTIFIER(:source_schema || ''.orders'');
-            CREATE OR REPLACE TABLE IDENTIFIER(:target_schema || ''.dim_customer'') AS ...
-        - Normalize to Databricks SQL (DBR 14.x+): types, functions, and syntax. End every statement with `;`.
-        - Ensure every notebook is **idempotent** (e.g., CREATE OR REPLACE, MERGE for upserts, TRUNCATE/INSERT with intent clear).
-        - Focus only on the **core business logic** (tables, transformations, DML/DDL).
-        - **Do not** include logging, audit checkpoints, or procedural status updates.
-        - **Do not** include explanations, prose, or unnecessary comments.
-        - If the procedure has procedural loops/branches that cannot be expressed in SQL, refactor them into set-based SQL or split into multiple sequential cells with deterministic steps.
-        
-      NAMING
         - task_name: lower_snake_case, concise, reflects the durable output (e.g., dim_customer_build, load_fact_sales).
         - Keep object names as in source (only schema/casing normalization as required by Databricks SQL).
         
@@ -540,32 +473,6 @@ workflow:
                 }
               ]
             }
-  
-      CONSTRAINTS
-        - [MANDATORY] `IDENTIFIER` usage is not allowed with (temporary) VIEWs. Change [TEMP] or regular VIEWs to just TABLEs [NOT temp] to Use IDENTIFIER. Use target_schema for creating tables.
-        - [MANDATORY] Reference widgets as `:widget` or `IDENTIFIER(:widget || ''.table'')`. ${{widget}} usage is not allowed inside the stored procedure.
-        - Do not include any global widgets block; only per-task `parameters`.
-        - `parameters` must be a dictionary, not a list.
-        - Do not include `include_if_ddl`.
-        - Each task’s `parameters` must match the widgets defined in its content.
-        - [MANDATORY] Try to not put special characters in variable names. If you have to include special characters in key, or include semicolon in value, please Use backquotes, e.g., SET `key`=`value`.
-        - The "content" of each task must be a **complete SQL notebook** obeying the content rules.
-        - Only include widgets actually Used by the task notebook (except source_schema; always include. target_schema only if DDL exists).
-        - Do not emit Python. Do not include code fences or extra text outside the single JSON.
-        - !!! IMPORTANT: Output raw JSON only. Do not Use ```json or ``` fencing. Do not include any prose before or after. !!!
-        - Convert separate INSERT/UPDATE/DELETE operations into a single MERGE statement. Focus on: 1) Proper join conditions, 2) WHEN MATCHED/NOT MATCHED logic, 3) Error handling, and 4) Performance optimization through single table access. For example:
-            MERGE INTO target USING source
-            ON target.key = source.key
-            WHEN MATCHED AND target.marked_for_deletion THEN DELETE
-            WHEN MATCHED THEN UPDATE SET target.updated_at = source.updated_at, target.value = DEFAULT
-        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, Use MERGE. Do NOT Use `UPDATE ... FROM ...` under any circumstance.
-        - Analyze DDLs and identify all tables with ''fact'' in their name (case-insensitive). For each fact table found, change the CREATE TABLE statement to include CLUSTER BY AUTO for automatic liquid clustering optimization in Databricks. For example:
-            CREATE OR REPLACE TABLE ... (
-            id INT,
-            name STRING,
-            value DOUBLE
-            )
-            CLUSTER BY AUTO;
       
       %%##conversion_prompts##%%
       %%##additional_prompts##%%
