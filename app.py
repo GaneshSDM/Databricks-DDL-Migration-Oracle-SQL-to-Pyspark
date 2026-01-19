@@ -215,6 +215,41 @@ ENTERPRISE_CSS = f"""
 </style>
 """
 st.markdown(ENTERPRISE_CSS, unsafe_allow_html=True)
+
+# Function to trigger auto-download
+
+def trigger_auto_download():
+    if st.session_state.get('trigger_auto_download', False) and st.session_state.get('download_mode', 'manual') == 'automatic':
+        import base64
+        from streamlit.components.v1 import html
+        
+        # Get the SQL code to download
+        sql_code = st.session_state.get('auto_download_sql', '')
+        
+        if sql_code:  # Only trigger download if there's actual content
+            # Create download link using JavaScript
+            b64 = base64.b64encode(sql_code.encode()).decode()
+            
+            # Execute JavaScript to trigger download
+            js_code = f'''<html><body><script>
+            function triggerDownload() {{
+                var link = document.createElement('a');
+                link.href = 'data:file/sql;base64,{b64}';
+                link.download = 'converted.sql';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }}
+            triggerDownload();
+            </script></body></html>'''
+            
+            # Show temporary message while download is triggered
+            html(js_code, height=0)
+            
+            # Reset the flag after triggering download
+            st.session_state.trigger_auto_download = False
+
+
  
 # -----------------------------------------------------------------------------
 # 4. STATE MANAGEMENT
@@ -244,6 +279,9 @@ if "model_settings" not in st.session_state:
    
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
+
+if "download_mode" not in st.session_state:
+    st.session_state.download_mode = "manual"  # Default to manual download
  
 # -----------------------------------------------------------------------------
 # 5. UI COMPONENTS
@@ -329,6 +367,9 @@ def render_convert_page():
            
             sql_code = ""
             changes_text = "No specific changes noted."
+            
+            # Trigger auto-download if flag is set
+            trigger_auto_download()
  
             # Clean artifacts if present (e.g. reasoning traces)
             if isinstance(result_text, str):
@@ -379,7 +420,7 @@ def render_convert_page():
                     tabs.append("Test Cases")
                
                 tab_objects = st.tabs(tabs)
-               
+                
                 with tab_objects[0]:  # Converted SQL tab
                     # --- MODIFICATION: Use st.code which provides a native copy button for older versions ---
                     st.markdown("##### Converted Code ")
@@ -388,19 +429,21 @@ def render_convert_page():
                         language="sql",
                         line_numbers=True # Useful for large code blocks
                     )
-                   
-                    # Add Download button below the code block
-                    # Keep the Download button separate as it's the only one needed here
-                    st.download_button(
-                        "Download SQL Code",
-                        sql_code,
-                        file_name="converted.sql",
-                        use_container_width=True,
-                        type="secondary"
-                    )
-                    # Removed the separate copy button columns/logic entirely since st.code handles it
- 
-               
+                    
+                    # Determine download behavior based on mode
+                    if st.session_state.download_mode == "automatic":
+                        # Trigger auto-download if flag is set
+                        trigger_auto_download()
+                        # No need to show download button in automatic mode
+                    else:  # manual mode
+                        # Show download button in manual mode
+                        st.download_button(
+                            "Download SQL Code",
+                            sql_code,
+                            file_name="converted.sql",
+                            use_container_width=True,
+                            type="secondary"
+                        )
                 with tab_objects[1]:  # Changes & Enhancements tab
                     st.markdown(changes_text)
                
@@ -525,6 +568,30 @@ def render_convert_page():
                             result = str(result)
  
                         st.session_state.last_result = result
+                        
+                        # Trigger auto-download of the converted SQL
+                        import re
+                        sql_code = ""
+                        sql_match = re.search(r"```sql(.*?)```", result, re.DOTALL)
+                        if sql_match:
+                            sql_code = sql_match.group(1).strip()
+                        else:
+                            # Fallback if no code blocks are found
+                            split_match = re.split(r"### Changes and Enhancements", result)
+                            sql_code = split_match[0].strip()
+                        
+                        # Store the SQL code for download
+                        st.session_state.auto_download_sql = sql_code
+                        
+                        # Mark that auto-download should occur
+                        st.session_state.trigger_auto_download = True
+                        
+                        # Show appropriate success message based on download mode
+                        if st.session_state.download_mode == "automatic":
+                            st.success("✅ Conversion complete! File download started automatically.")
+                        else:
+                            st.success("✅ Conversion complete! Click the Download button to save the file.")
+                        
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -535,9 +602,20 @@ def render_convert_page():
     # ac2 and ac3 are now empty or used for spacing
     with ac2:
         pass # Empty column for visual separation/padding
-   
+        
     with ac3:
-        pass # Empty column for visual separation/padding
+        # Download mode toggle
+        current_index = 0 if st.session_state.download_mode == "manual" else 1
+        selected_mode = st.radio(
+            "Download Mode",
+            options=["manual", "automatic"],
+            format_func=lambda x: "Manual Download" if x == "manual" else "Automatic Download",
+            index=current_index,
+            help="Choose how you want to download the converted SQL: manually with a button or automatically after conversion"
+        )
+        # Update session state when selection changes
+        if selected_mode != st.session_state.download_mode:
+            st.session_state.download_mode = selected_mode
  
     st.markdown('</div>', unsafe_allow_html=True)
  
