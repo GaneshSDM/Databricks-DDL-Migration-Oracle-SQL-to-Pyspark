@@ -227,12 +227,10 @@ if "conversion_history" not in st.session_state:
 if "model_settings" not in st.session_state:
     # Default to first model from settings page
     default_models = {
-        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations",
-        "databricks-claude-sonnet-4-5": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-gemini-2-5-pro": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-gpt-oss-120b": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
-        "databricks-claude-opus-4-1": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
+        "databricks-meta-llama-3-3-70b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-3-70b-instruct/invocations",
+        "databricks-meta-llama-3-1-8b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-8b-instruct/invocations",
+        "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
+        "databricks-llama-4-maverick": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-llama-4-maverick/invocations"
     }
     first_model = list(default_models.keys())[0]
    
@@ -695,12 +693,10 @@ def render_settings_page():
    
     # Model endpoints mapping
     model_endpoints = {
-        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations",
-        "databricks-claude-sonnet-4-5": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-gemini-2-5-pro": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-gpt-oss-120b": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
-        "databricks-claude-opus-4-1": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
+        "databricks-meta-llama-3-3-70b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-3-70b-instruct/invocations",
+        "databricks-meta-llama-3-1-8b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-8b-instruct/invocations",
+        "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
+        "databricks-llama-4-maverick": "https://dbc-66f0fcff-3920.cloud.databricks.com/serving-endpoints/databricks-llama-4-maverick/invocations"
     }
     c1, c2 = st.columns(2)
    
