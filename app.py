@@ -5,6 +5,7 @@ import time
 from dotenv import load_dotenv
 from ai_migration import MigrationAI
 from simple_validator import SimpleValidator
+from batch_converter import BatchConverter, BatchConverterResult
  
 # -----------------------------------------------------------------------------
 # 1. PAGE CONFIGURATION
@@ -226,12 +227,12 @@ if "conversion_history" not in st.session_state:
 if "model_settings" not in st.session_state:
     # Default to first model from settings page
     default_models = {
-        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations",
-        "databricks-claude-sonnet-4-5": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-gemini-2-5-pro": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
+        "databricks-meta-llama-3-1-405b-instruct": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations",
+        "databricks-claude-sonnet-4-5": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
+        "databricks-gemini-2-5-pro": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
         "databricks-gpt-oss-120b": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
         "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
-        "databricks-claude-opus-4-1": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
+        "databricks-claude-opus-4-1": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
     }
     first_model = list(default_models.keys())[0]
    
@@ -297,12 +298,15 @@ def render_convert_page():
    
     with c1:
         st.markdown("### Input Source")
-        input_type = st.radio("Select Input Method", ["Direct Input", "File Upload"], horizontal=True, label_visibility="collapsed")
+        input_type = st.radio("Select Input Method", ["Direct Input", "File Upload", "Folder Upload (ZIP)"], horizontal=False, label_visibility="collapsed")
        
         sql_input = ""
+        folder_zip_path = None
+        
         if input_type == "Direct Input":
             sql_input = st.text_area("Paste your Oracle SQL here", height=400, placeholder="-- Paste your Oracle SQL or PL/SQL code here...")
-        else:
+        
+        elif input_type == "File Upload":
             uploaded_file = st.file_uploader("Upload .sql file", type=["sql", "txt"])
             if uploaded_file:
                 try:
@@ -320,7 +324,27 @@ def render_convert_page():
                        
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
- 
+        
+        elif input_type == "Folder Upload (ZIP)":
+            uploaded_zip = st.file_uploader("Upload .zip file containing SQL files", type=["zip"])
+            if uploaded_zip:
+                try:
+                    import tempfile
+                    file_size = uploaded_zip.size
+                    if file_size > 50 * 1024 * 1024:  # 50MB limit for ZIP
+                        st.warning(f"Large ZIP detected ({file_size / (1024*1024):.1f}MB). This may take a moment...")
+                    
+                    # Save ZIP temporarily
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+                        tmp.write(uploaded_zip.read())
+                        folder_zip_path = tmp.name
+                    
+                    st.success(f"Loaded {uploaded_zip.name} ({file_size / 1024:.1f}KB)")
+                    st.info("📁 ZIP file loaded. Will process all .sql, .txt, and .ddl files recursively.")
+                
+                except Exception as e:
+                    st.error(f"Error reading ZIP file: {e}")
+    
     with c2:
         st.markdown("### Output Databricks SQL")
        
@@ -356,21 +380,22 @@ def render_convert_page():
  
                 # Extract SQL Code
                 import re
-                sql_match = re.search(r"```sql(.*?)```", result_text, re.DOTALL)
-                if sql_match:
-                    sql_code = sql_match.group(1).strip()
-                else:
-                    # Fallback
-                    split_match = re.split(r"### Changes and Enhancements", result_text)
-                    sql_code = split_match[0].strip()
- 
-                # Extract Changes
-                changes_match = re.search(r"### Changes and Enhancements(.*)", result_text, re.DOTALL)
-                if changes_match:
-                    changes_text = changes_match.group(1).strip()
+                
+                # Remove markdown code fences if present
+                sql_code = result_text
+                if "```sql" in result_text:
+                    sql_match = re.search(r"```sql(.*?)```", result_text, re.DOTALL)
+                    if sql_match:
+                        sql_code = sql_match.group(1).strip()
+                
+                # Remove "### Changes and Enhancements" section entirely
+                if "### Changes and Enhancements" in sql_code:
+                    sql_code = sql_code.split("### Changes and Enhancements")[0].strip()
+                
+                changes_text = "No additional changes notes."
  
                 # Display in Tabs
-                tabs = ["Converted SQL", "Changes & Enhancements"]
+                tabs = ["Converted SQL"]
                
                 # Add validation tab if validation was performed
                 if st.session_state.get('validation_results'):
@@ -399,14 +424,10 @@ def render_convert_page():
                         type="secondary"
                     )
                     # Removed the separate copy button columns/logic entirely since st.code handles it
- 
-               
-                with tab_objects[1]:  # Changes & Enhancements tab
-                    st.markdown(changes_text)
                
                 # Validation Results tab
-                if len(tab_objects) > 2 and st.session_state.get('validation_results'):
-                    with tab_objects[2]:
+                if len(tab_objects) > 1 and st.session_state.get('validation_results'):
+                    with tab_objects[1]:
                         st.markdown("##### Validation Summary")
                        
                         validation_results = st.session_state.validation_results
@@ -466,8 +487,9 @@ def render_convert_page():
                             st.success("✅ No issues found - Migration is excellent!")
                
                 # Test Cases tab
-                if len(tab_objects) > 3 and st.session_state.get('test_cases'):
-                    with tab_objects[3]:
+                tab_index = 2 if st.session_state.get('validation_results') else 1
+                if len(tab_objects) > tab_index and st.session_state.get('test_cases'):
+                    with tab_objects[tab_index]:
                         st.markdown("##### Generated Test Cases")
                         test_cases_text = '\n'.join(st.session_state.test_cases)
                         st.code(test_cases_text, language="sql")
@@ -498,36 +520,89 @@ def render_convert_page():
     # MODIFIED: Consolidate Button and Checkbox in the first column (ac1)
     # -------------------------------------------------------------------------
     with ac1:
-        if st.button(" Convert to Databricks SQL", use_container_width=True):
-            if not sql_input.strip():
-                st.error("Please provide SQL input.")
-            else:
-                with st.spinner("Analyzing and Converting..."):
-                    try:
-                        temp = st.session_state.model_settings["temperature"]
-                        tokens = st.session_state.model_settings["max_tokens"]
-                       
-                        # Use standard migration with simple validation
-                        migration_ai = MigrationAI(
+        if input_type == "Folder Upload (ZIP)" and folder_zip_path:
+            if st.button(" Convert ZIP to Databricks SQL", use_container_width=True):
+                if not folder_zip_path:
+                    st.error("Please upload a ZIP file.")
+                else:
+                    with st.spinner("Extracting and Converting..."):
+                        try:
+                            temp = st.session_state.model_settings["temperature"]
+                            tokens = st.session_state.model_settings["max_tokens"]
+                           
+                            # Initialize batch converter
+                            migration_ai = MigrationAI(
                                 api_key=API_KEY,
                                 endpoint=st.session_state.model_settings["endpoint"]
-                        )
+                            )
+                            batch_converter = BatchConverter(migration_ai)
+                            
+                            # Progress placeholder
+                            progress_placeholder = st.empty()
+                            status_placeholder = st.empty()
+                            
+                            def progress_callback(current, total, filename):
+                                progress_placeholder.progress(current / total)
+                                status_placeholder.text(f"Processing: {filename} ({current}/{total})")
+                            
+                            # Process batch from ZIP
+                            result = batch_converter.process_batch(
+                                folder_zip_path,
+                                progress_callback=progress_callback
+                            )
+                            
+                            # Rebuild output structure with deterministic naming
+                            converted_output_dir = batch_converter.rebuild_output_structure(result, "")
+                            
+                            # Create output ZIP with deterministic name
+                            output_zip_path = batch_converter.create_output_zip(converted_output_dir, result.folder_name)
+                            
+                            # Store results in session
+                            st.session_state.batch_result = result
+                            st.session_state.output_zip_path = output_zip_path
+                            st.session_state.output_dir = converted_output_dir
+                            
+                            progress_placeholder.empty()
+                            status_placeholder.empty()
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                            import traceback
+                            st.error(traceback.format_exc())
+        else:
+            if st.button(" Convert to Databricks SQL", use_container_width=True):
+                if input_type == "Folder Upload (ZIP)":
+                    st.error("Please upload a ZIP file.")
+                elif not sql_input.strip():
+                    st.error("Please provide SQL input.")
+                else:
+                    with st.spinner("Analyzing and Converting..."):
+                        try:
+                            temp = st.session_state.model_settings["temperature"]
+                            tokens = st.session_state.model_settings["max_tokens"]
+                           
+                            # Use standard migration with simple validation
+                            migration_ai = MigrationAI(
+                                    api_key=API_KEY,
+                                    endpoint=st.session_state.model_settings["endpoint"]
+                            )
 
-                        result = migration_ai.migrate_schema(
-                            sql_input,
-                            temperature=temp,
-                            max_tokens=tokens
-                        )
-                       
-                        if isinstance(result, list):
-                            result = "\n".join(map(str, result))
-                        elif not isinstance(result, str):
-                            result = str(result)
- 
-                        st.session_state.last_result = result
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+                            result = migration_ai.migrate_schema(
+                                sql_input,
+                                temperature=temp,
+                                max_tokens=tokens
+                            )
+                           
+                            if isinstance(result, list):
+                                result = "\n".join(map(str, result))
+                            elif not isinstance(result, str):
+                                result = str(result)
+         
+                            st.session_state.last_result = result
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
        
  
     # -------------------------------------------------------------------------
@@ -540,6 +615,49 @@ def render_convert_page():
         pass # Empty column for visual separation/padding
  
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Display batch results if available
+    if st.session_state.get('batch_result'):
+        result = st.session_state.batch_result
+        st.markdown('<div class="card"><div class="card-header">📦 Batch Conversion Results</div>', unsafe_allow_html=True)
+        
+        # Summary
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Files", result.total_files)
+        with col2:
+            st.metric("✓ Successful", len(result.successful_conversions))
+        with col3:
+            st.metric("✗ Failed", len(result.failed_conversions))
+        
+        st.info(result.get_summary())
+        
+        # File list
+        with st.expander("📋 Converted Files", expanded=True):
+            for rel_path in sorted(result.successful_conversions.keys()):
+                st.success(f"✓ {rel_path}")
+        
+        # Errors if any
+        if result.failed_conversions:
+            with st.expander("⚠️ Failed Files", expanded=False):
+                for rel_path, error in result.failed_conversions.items():
+                    st.error(f"✗ {rel_path}: {error}")
+        
+        # Download button
+        if st.session_state.get('output_zip_path') and os.path.exists(st.session_state.output_zip_path):
+            with open(st.session_state.output_zip_path, 'rb') as f:
+                zip_data = f.read()
+            
+            output_name = os.path.basename(st.session_state.output_zip_path)
+            st.download_button(
+                "📥 Download Converted ZIP",
+                zip_data,
+                file_name=output_name,
+                use_container_width=True,
+                type="primary"
+            )
+        
+        st.markdown('</div>', unsafe_allow_html=True)
  
 def render_finetuning_page():
     st.markdown('<div class="card"><div class="card-header"> Model Fine-Tuning Center</div>', unsafe_allow_html=True)
@@ -578,11 +696,11 @@ def render_settings_page():
     # Model endpoints mapping
     model_endpoints = {
         "databricks-meta-llama-3-1-405b-instruct": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-meta-llama-3-1-405b-instruct/invocations",
-        "databricks-claude-sonnet-4-5": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
-        "databricks-gemini-2-5-pro": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
+        "databricks-claude-sonnet-4-5": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
+        "databricks-gemini-2-5-pro": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
         "databricks-gpt-oss-120b": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations",
         "databricks-qwen3-next-80b-a3b-instruct": "https://dbc-e8fae528-2bde.cloud.databricks.com/serving-endpoints/databricks-qwen3-next-80b-a3b-instruct/invocations",
-        "databricks-claude-opus-4-1": "https://dbc-16797bba-8dc3.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
+        "databricks-claude-opus-4-1": "https://dbc-10920e49-e279.cloud.databricks.com/serving-endpoints/databricks-gpt-oss-120b/invocations"
     }
     c1, c2 = st.columns(2)
    

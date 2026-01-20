@@ -4,6 +4,7 @@ import requests
 import time
 import logging
 import ast
+import re
 import streamlit as st
 
 # Configure Enterprise Logging
@@ -59,7 +60,7 @@ class MigrationAI:
                 time.sleep(2 ** attempt)  # Exponential backoff
 
     def _clean_model_output(self, content):
-        """Parses and cleans the model output if it contains structured reasoning traces."""
+        """Parses and cleans the model output if it contains structured reasoning traces and removes explanatory sections."""
         if not content:
             return ""
             
@@ -79,8 +80,32 @@ class MigrationAI:
                         pass
             
             if found_structured:
-                return full_text
-                
+                content = full_text
+        
+        # Remove markdown code fences
+        if "```sql" in content:
+            sql_match = re.search(r"```sql(.*?)```", content, re.DOTALL)
+            if sql_match:
+                content = sql_match.group(1).strip()
+        
+        # Remove "### Changes and Enhancements" section and everything after it
+        if "### Changes and Enhancements" in content:
+            content = content.split("### Changes and Enhancements")[0].strip()
+        
+        # Remove other explanation patterns
+        if content.startswith("**") or "**Input" in content or "**Output" in content:
+            # Extract just SQL parts
+            lines = content.split('\n')
+            sql_lines = []
+            for line in lines:
+                # Skip explanation lines
+                if line.strip().startswith('**') or line.strip().startswith('--') and 'Output' in line:
+                    continue
+                if 'Input' in line or 'Output' in line or 'Optimized' in line:
+                    continue
+                sql_lines.append(line)
+            content = '\n'.join(sql_lines).strip()
+        
         return content
 
     # ------------------------------
@@ -483,15 +508,13 @@ workflow:
 
 
 
-**Output Format:**
-1. Provide the **pysql** code in a single markdown block (```sql ... ```).
-2. After the code block, provide a section titled "### Changes and Enhancements" where you list the specific changes made, optimizations applied, and any reasoning.
+Return ONLY Databricks SQL. Do NOT include explanations, markdown (```sql), or "Changes and Enhancements" sections.
 
 **Input (Oracle):**
 
 {oracle_sql}
 
-**Output (Databricks):**
+**Output (Databricks SQL only):**
 """
         return self.call_llama(prompt)
 
@@ -524,21 +547,22 @@ workflow:
             result = self.migrate_schema(chunk, **kwargs)
             results.append(result)
 
-        # Combine results
+        # Combine results - return only SQL
         combined_sql = ""
-        combined_changes = "### Changes and Enhancements\n"
         
         for result in results:
+            # Extract just the SQL, removing any markdown or explanations
             if "```sql" in result:
                 sql_match = re.search(r"```sql(.*?)```", result, re.DOTALL)
                 if sql_match:
                     combined_sql += sql_match.group(1).strip() + "\n\n"
-            
-            changes_match = re.search(r"### Changes and Enhancements(.*)", result, re.DOTALL)
-            if changes_match:
-                combined_changes += changes_match.group(1).strip() + "\n"
+            else:
+                # If no markdown, extract before "###" or "Changes" sections
+                sql_part = re.split(r"###|Changes and Enhancements", result)[0].strip()
+                if sql_part:
+                    combined_sql += sql_part + "\n\n"
         
-        return f"```sql\n{combined_sql}```\n\n{combined_changes}"
+        return combined_sql.strip()
 
     def migrate_procedure(self, oracle_procedure, **kwargs):
         prompt = f"""
@@ -705,14 +729,12 @@ FINAL EXECUTION COMMAND
 =======================
 
 "Apply this entire migration pipeline to convert [SOURCE_DATABASE] to Databricks. Preserve datatypes exactly, enforce VARCHAR over STRING, use CURRENT_DATE for DATE defaults, remove UNIQUE constraints, convert PK/FK to informational comments, enforce constraints using NOT NULL + CHECK where needed, ensure **CHECK constraints are added via separate ALTER TABLE statements**, follow SQL-first strategy, and output all required documentation and testing steps."
-**Output Format:**
-1. Provide the **Databricks SQL** code in a single markdown block (```sql ... ```).
-2. After the code block, provide a section titled "### Changes and Enhancements" where you list the specific changes made, optimizations applied, and any reasoning.
+Return ONLY Databricks SQL. Do NOT include explanations, markdown (```sql), or "Changes and Enhancements" sections.
 
 **Input (Oracle):**
 {oracle_procedure}
 
-**Output (Databricks):**
+**Output (Databricks SQL only):**
 """
         return self.call_llama(prompt, **kwargs)
 
@@ -744,14 +766,12 @@ WHERE c.region = 'US';
 
 ---
 
-**Output Format:**
-1. Provide the **Optimized SQL** code in a single markdown block (```sql ... ```).
-2. After the code block, provide a section titled "### Changes and Enhancements" where you list the specific changes made, optimizations applied, and any reasoning.
+Return ONLY Databricks SQL. Do NOT include explanations, markdown (```sql), or "Changes and Enhancements" sections.
 
 **Input:**
 {sql_query}
 
-**Optimized Query:**
+**Optimized Query (SQL only):**
 """
         return self.call_llama(prompt, **kwargs)
 
